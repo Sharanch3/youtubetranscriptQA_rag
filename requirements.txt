@@ -1,0 +1,16 @@
+#langchain
+langchain
+langchain-community
+langchain-core
+langchain-openai
+langchain-chroma
+
+#jupyternotebook
+ipykernel
+
+#load .env
+python-dotenv
+
+#transcriptapi
+youtube-transcript-api
+
