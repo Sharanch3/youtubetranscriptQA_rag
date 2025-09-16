@@ -22,6 +22,10 @@ Built with **LangChain**, **OpenAI**, **Chroma**, and **Streamlit**.
 - [YouTube Transcript API](https://pypi.org/project/youtube-transcript-api/)
 
 ---
+## 🌐 Live Demo
+🌐 **Click this link** (https://transcript-youtube-rag.streamlit.app/)
+
+---
 
 ## 🚀 Setup & Installation
 
