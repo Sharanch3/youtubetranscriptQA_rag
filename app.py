@@ -1,5 +1,10 @@
 import streamlit as st
-from rag_utils import get_yt_transcript, generate_answer  
+from rag_utils import get_yt_transcript, generate_answer 
+
+#key setup for streamlit secrets management
+api_key = st.secrets["openai"]["OPENAI_API_KEY"]
+
+
 
 st.set_page_config(page_title="YouTube Q&A", page_icon="🎬", layout="centered")
 
