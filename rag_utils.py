@@ -1,3 +1,4 @@
+import streamlit as st
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import load_prompt
@@ -20,6 +21,12 @@ VECTORDB_PATH = Path(__file__).parent / "resources/vector_store"
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 100
 
+
+#key setup for streamlit secrets management
+api_key = st.secrets["OPENAI_API_KEY"]
+
+
+
 #Initialize objects
 llm = None
 vector_store = None
@@ -34,19 +41,22 @@ def initialize_components():
 
         llm = ChatOpenAI(
             model= LLM_MODEL,
-            temperature= TEMPERATURE
+            temperature= TEMPERATURE,
+            openai_api_key= api_key
         )
 
     if vector_store is None:
 
         embedding_model = OpenAIEmbeddings(
-            model= EMBEDDING_MODEL
+            model= EMBEDDING_MODEL,
+            openai_api_key= api_key
         )
 
         vector_store = Chroma(
             collection_name = NAME_OF_DB,
             embedding_function = embedding_model,
-            persist_directory = str(VECTORDB_PATH)
+            persist_directory = str(VECTORDB_PATH),
+
         )
 
 
