@@ -22,17 +22,12 @@ CHUNK_SIZE = 800
 CHUNK_OVERLAP = 100
 
 
-#key setup for streamlit secrets management
-api_key = st.secrets["OPENAI_API_KEY"]
-
-
-
 #Initialize objects
 llm = None
 vector_store = None
 
 
-def initialize_components():
+def initialize_components(api_key: str):
     """Initialize LLM and vector store once."""
 
     global llm, vector_store
