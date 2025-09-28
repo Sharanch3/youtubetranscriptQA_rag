@@ -30,27 +30,30 @@ vector_store = None
 
 #---------PURE FUNCTIONS----------#
 def load_api_key():
-    """Load and read the API key from streamlit or .env file."""
-    load_dotenv()
+    """
+    Load the OpenAI API key.
 
-    #for cloud deployment
+    • On Streamlit Cloud: reads from st.secrets["OPENAI_API_KEY"].
+    • On local machine: falls back to .env file.
+    """
     try:
         import streamlit as st
         if "OPENAI_API_KEY" in st.secrets:
             return st.secrets["OPENAI_API_KEY"]
-    except ImportError:
-        pass 
     except Exception:
+        # st.secrets not available (e.g. local run without Streamlit)
         pass
 
-    #for local development
+    # ---- Local fallback (.env) ----
+    from dotenv import load_dotenv
+    load_dotenv()
     api_key = os.getenv("OPENAI_API_KEY")
-    
     if not api_key:
         raise ValueError(
-            "OPENAI_API_KEY not found. Ensure .env file exists with OPENAI_API_KEY or Streamlt secrets are configured"
+            "OPENAI_API_KEY not found. "
+            "On Streamlit Cloud, add it in Settings → Secrets. "
+            "Locally, create a .env file with OPENAI_API_KEY=your_key."
         )
-    
     return api_key
 
 
