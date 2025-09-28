@@ -31,6 +31,7 @@ vector_store = None
 #---------PURE FUNCTIONS----------#
 def load_api_key():
     """Load and read the API key from streamlit or .env file."""
+    load_dotenv()
 
     #for cloud deployment
     try:
@@ -43,8 +44,6 @@ def load_api_key():
         pass
 
     #for local development
-    load_dotenv()
-        
     api_key = os.getenv("OPENAI_API_KEY")
     
     if not api_key:
