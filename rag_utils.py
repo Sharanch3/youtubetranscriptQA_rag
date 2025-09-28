@@ -112,7 +112,7 @@ def get_yt_transcript(url:str, api_key: str):
         # raw_transcript looks like - [{"text": "some words", "start": 12.3, "duration": 4.2}, ...]
 
         #Join all the transcript texts into one long string.
-        transcript = " ".join(transcript.text for transcript in raw_transcript)
+        transcript = " ".join(transcript["text"] for transcript in raw_transcript)
 
     except TranscriptsDisabled:
         raise RuntimeError(f"No transcript availabe for the video id: {video_id}")
