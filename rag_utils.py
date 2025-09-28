@@ -1,30 +1,59 @@
-import streamlit as st
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import load_prompt
-from langchain_chroma import Chroma
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
-from langchain_core.runnables import RunnableParallel, RunnableLambda, RunnablePassthrough
-from langchain_community.document_loaders.youtube import YoutubeLoader
+import os
 from pathlib import Path
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_chroma import Chroma
+from langchain_community.document_loaders.youtube import YoutubeLoader
+from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_core.prompts import load_prompt
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableLambda
 from dotenv import load_dotenv
 
-load_dotenv()
 
-# ---------- CONSTANTS ----------
-TEMPERATURE = 0.8
+#---------CONFIGURATION CONSTANTS---------#
+
 LLM_MODEL = "gpt-4o-mini"
+TEMPERATURE = 0.6
 EMBEDDING_MODEL = "text-embedding-3-small"
-NAME_OF_DB = "Youtube_transcript"
-VECTORDB_PATH = Path(__file__).parent / "resources/vector_store"
-CHUNK_SIZE = 800
-CHUNK_OVERLAP = 100
+COLLECTION_NAME = "youtube-transcript"
+VECTOR_DB_PATH = Path(__file__).parent/"resources/vector_store"
+CHUNK_SIZE = 500
+CHUNK_OVERLAP = 80
 
 
-#Initialize objects
+
+#------INITIALIZE OBJECTS---------#
 llm = None
 vector_store = None
+
+
+#---------PURE FUNCTIONS----------#
+def load_api_key():
+    """Load and read the API key from streamlit or .env file."""
+
+    #for cloud deployment
+    try:
+        import streamlit as st
+        if "OPENAI_API_KEY" in st.secrets:
+            return st.secrets["OPENAI_API_KEY"]
+    except ImportError:
+        pass 
+    except Exception:
+        pass
+
+    #for local development
+    load_dotenv()
+        
+    api_key = os.getenv("OPENAI_API_KEY")
+    
+    if not api_key:
+        raise ValueError(
+            "OPENAI_API_KEY not found. Ensure .env file exists with OPENAI_API_KEY or Streamlt secrets are configured"
+        )
+    
+    return api_key
+
 
 
 def initialize_components(api_key: str):
@@ -33,47 +62,44 @@ def initialize_components(api_key: str):
     global llm, vector_store
 
     if llm is None:
-
         llm = ChatOpenAI(
-            model= LLM_MODEL,
+            model = LLM_MODEL,
             temperature= TEMPERATURE,
-            openai_api_key= api_key
+            api_key= api_key
         )
 
     if vector_store is None:
 
         embedding_model = OpenAIEmbeddings(
-            model= EMBEDDING_MODEL,
-            openai_api_key= api_key
+            model = EMBEDDING_MODEL,
+            api_key= api_key
         )
 
         vector_store = Chroma(
-            collection_name = NAME_OF_DB,
-            embedding_function = embedding_model,
-            persist_directory = str(VECTORDB_PATH),
-
+            collection_name= COLLECTION_NAME,
+            embedding_function= embedding_model,
+            persist_directory= str(VECTOR_DB_PATH)
         )
 
 
+
 def get_video_id(url: str) -> str:
-    """Extract YouTube video ID from the URL."""
+    """Extract Youtube video ID from the given URL"""
 
     return YoutubeLoader.extract_video_id(url)
 
 
-def get_yt_transcript(url: str):
-    """
-    Fetch the YouTube transcript and store it in the vector store.
-    """
+def get_yt_transcript(url:str, api_key: str):
+    """Fetch the Youtube transcript and store it in the vector store"""
 
-    yield "Initializing components..."
-    initialize_components()
+    yield "Initialize components..."
+    initialize_components(api_key= api_key)
 
-    yield "Resetting vector store..."
-    vector_store.reset_collection()  #Clears any existing documents
+    yield "Resetting vector store.." #clear any existing documents
+    vector_store.reset_collection()
 
     yield "Fetching Video ID..."
-    video_id = get_video_id(url)
+    video_id = get_video_id(url= url)
 
     yield "Loading transcript..."
     try:
@@ -81,19 +107,21 @@ def get_yt_transcript(url: str):
         transcript_list = yt_api.list(video_id= video_id)
         transcript_en = transcript_list.find_generated_transcript(language_codes=['en'])
         raw_transcript = transcript_en.fetch()
-        #raw _transcript looks like -{"text": "some words", "start": 12.3, "duration": 4.2}
+        # raw_transcript looks like - [{"text": "some words", "start": 12.3, "duration": 4.2}, ...]
 
-        #Joins all the caption texts into one long string.
+        #Join all the transcript texts into one long string.
         transcript = " ".join(transcript.text for transcript in raw_transcript)
-        
+
     except TranscriptsDisabled:
-        raise RuntimeError(f"No transcript available for the video id: {video_id}")
+        raise RuntimeError(f"No transcript availabe for the video id: {video_id}")
+    except Exception as e:
+        raise RuntimeError(f"Error fetching transcript: {str(e)}")
 
 
     yield "Splitting transcript into chunks..."
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=CHUNK_SIZE,
-        chunk_overlap=CHUNK_OVERLAP
+        chunk_size = CHUNK_SIZE,
+        chunk_overlap = CHUNK_OVERLAP
     )
 
     chunks = splitter.create_documents([transcript])
@@ -101,25 +129,27 @@ def get_yt_transcript(url: str):
     yield "Adding chunks to vector store..."
     vector_store.add_documents(chunks)
 
-    yield "Finished adding documents to vectore database"
+    yield "Finished adding documents to vector database"
 
-def generate_answer(query: str) -> str:
-    """Retrieve context from the vector DB and answer the query."""
+
+def generate_answer(query:str) ->str:
+    """retrieved context from the vector DB and anwers the query"""
 
     if vector_store is None:
-        raise RuntimeError("Vector DB is not initialized")
+        raise RuntimeError("VectorDB is not initialized. Please process a Youtube URL first")
+    
+    retriever = vector_store.as_retriever(search_type = "similarity", search_kwargs = {'k':3})
 
-    retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 2})
-
-    # Combines multiple retrieved chunks into one context string
+    #combines muliple retrieved chunks into one context string
     def format_doc(retrieved_doc):
         context_text = "\n\n".join(doc.page_content for doc in retrieved_doc)
-
+        
         return context_text
-
-    prompt = load_prompt("template.json")
+    
+    prompt = load_prompt('template.json')
 
     parser = StrOutputParser()
+
 
     parallel_chain = RunnableParallel({
         "context": retriever | RunnableLambda(format_doc),
@@ -128,16 +158,17 @@ def generate_answer(query: str) -> str:
 
     final_chain = parallel_chain | prompt | llm | parser
 
-    # Pass query as dict
+    #pass query as string directly
     return final_chain.invoke(query)
 
 
 
 if __name__ == "__main__":
-    url = "https://www.youtube.com/watch?v=fNk_zzaMoSs&t=227s"
-    get_yt_transcript(url=url)
-    answer = generate_answer("Summarise the key concepts explained in the video.")
-    print("\n--- Answer ---\n", answer)
+    
+    api_key = load_api_key()
+    url ="https://www.youtube.com/watch?v=aircAruvnKk&t=4s"
 
-    
-    
+    get_yt_transcript(url = url, api_key= api_key)
+    answer = generate_answer("Summarize the key concepts of neural Network")
+    print(f"Answer:{answer}")
+
